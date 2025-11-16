@@ -33,6 +33,8 @@ function verboseGroupEnd() {
   }
 }
 
+const FORUM_CHANNEL_ID = process.env.DISCORD_FORUM_CHANNEL_ID;
+
 async function getDiscordClient() {
   const discord = new DiscordClient({
     intents: [
@@ -141,12 +143,17 @@ async function* streamThreadTranscripts(
 }
 
 export async function processThreads() {
+  if (!FORUM_CHANNEL_ID) {
+    throw new Error("DISCORD_FORUM_CHANNEL_ID is not set");
+  }
   const discord = await getDiscordClient();
 
   const forumChannel = (await discord.channels.fetch(
-    "1084972377529667584",
+    FORUM_CHANNEL_ID,
   )) as ForumChannel;
 
+  let processedCount = 0;
+  let skippedCount = 0;
   for await (const threadData of streamThreadTranscripts(
     forumChannel,
     LOOKBACK,
@@ -157,6 +164,7 @@ export async function processThreads() {
     if (!threadData.hasChanges) {
       verboseLog("Skipping (no new messages)");
       verboseGroupEnd();
+      skippedCount += 1;
       continue;
     }
 
@@ -178,5 +186,14 @@ export async function processThreads() {
       threadData.lastMessageTimestamp,
     );
     verboseGroupEnd();
+    processedCount += 1;
+  }
+
+  if (processedCount === 0) {
+    console.log(`${skippedCount} threads were up-to-date; no new summaries.`);
+  } else {
+    console.log(
+      `Processed ${processedCount} threads (${skippedCount} skipped without changes).`,
+    );
   }
 }
