@@ -3,11 +3,35 @@ import {
   Client as DiscordClient,
   GatewayIntentBits,
   ForumChannel,
+  type Message,
 } from "discord.js";
 import { summarizeThread, type TranscriptMessage } from "./summarizer";
-import { getThreadSummary, upsertThreadSummary } from "./db";
+import {
+  getThreadSummary,
+  upsertThreadSummary,
+  type ThreadSummaryRow,
+} from "./db";
 
 const LOOKBACK = Number(process.env.LOOKBACK ?? 2);
+const VERBOSE_LOG = process.env.DISCORD_VERBOSE_LOGS === "true";
+
+function verboseLog(...args: Parameters<typeof console.log>) {
+  if (VERBOSE_LOG) {
+    console.log(...args);
+  }
+}
+
+function verboseGroup(label: string) {
+  if (VERBOSE_LOG) {
+    console.group(label);
+  }
+}
+
+function verboseGroupEnd() {
+  if (VERBOSE_LOG) {
+    console.groupEnd();
+  }
+}
 
 async function getDiscordClient() {
   const discord = new DiscordClient({
@@ -26,9 +50,28 @@ async function getDiscordClient() {
   return discord;
 }
 
-async function fetchAllMessages(thread: ThreadChannel) {
-  const all: any[] = [];
-  let before: string | undefined;
+type FetchedTranscript = {
+  transcript: TranscriptMessage[];
+  lastMessageTimestamp: number;
+};
+
+async function fetchAllMessages(
+  thread: ThreadChannel,
+  existing?: ThreadSummaryRow,
+): Promise<FetchedTranscript | undefined> {
+  const newestBatch = await thread.messages.fetch({ limit: 1 });
+  const newestMessage = newestBatch.first();
+  if (!newestMessage) return undefined;
+
+  if (
+    existing &&
+    existing.lastMessageTimestamp === newestMessage.createdTimestamp
+  ) {
+    return undefined;
+  }
+
+  const all: Message[] = [...newestBatch.values()];
+  let before = all[all.length - 1]?.id;
 
   while (true) {
     const batch = await thread.messages.fetch({
@@ -40,10 +83,60 @@ async function fetchAllMessages(thread: ThreadChannel) {
     const messages = [...batch.values()];
     all.push(...messages);
     before = messages[messages.length - 1].id;
-    if (all.length >= 500) break;
   }
 
-  return all.reverse();
+  const transcript = all.reverse().map((message) => ({
+    user: message.author.globalName ?? message.author.username,
+    content: message.content,
+  }));
+
+  return {
+    transcript,
+    lastMessageTimestamp: newestMessage.createdTimestamp,
+  };
+}
+
+type ThreadTranscript = {
+  threadId: string;
+  threadName: string;
+  transcript: TranscriptMessage[];
+  lastMessageTimestamp: number;
+  hasChanges: boolean;
+};
+
+async function* streamThreadTranscripts(
+  forumChannel: ForumChannel,
+  lookback: number,
+): AsyncGenerator<ThreadTranscript> {
+  const archived = await forumChannel.threads.fetchArchived({
+    type: "public",
+    limit: lookback,
+  });
+  verboseLog(`Fetched ${archived.threads.size} archived threads`);
+
+  for (const [, thread] of archived.threads) {
+    const existing = await getThreadSummary(thread.id);
+    const fetched = await fetchAllMessages(thread, existing);
+
+    if (!fetched) {
+      yield {
+        threadId: thread.id,
+        threadName: thread.name,
+        lastMessageTimestamp: existing?.lastMessageTimestamp ?? 0,
+        transcript: [],
+        hasChanges: false,
+      };
+      continue;
+    }
+
+    yield {
+      threadId: thread.id,
+      threadName: thread.name,
+      lastMessageTimestamp: fetched.lastMessageTimestamp,
+      transcript: fetched.transcript,
+      hasChanges: true,
+    };
+  }
 }
 
 export async function processThreads() {
@@ -53,35 +146,36 @@ export async function processThreads() {
     "1084972377529667584",
   )) as ForumChannel;
 
-  const archived = await forumChannel.threads.fetchArchived({
-    type: "public",
-    limit: LOOKBACK,
-  });
+  for await (const threadData of streamThreadTranscripts(
+    forumChannel,
+    LOOKBACK,
+  )) {
+    verboseGroup(`Thread "${threadData.threadName}"`);
+    verboseLog("Starting");
 
-  for (const [, thread] of archived.threads) {
-    const messages = await fetchAllMessages(thread);
-    const lastMessage = messages.at(-1);
-    if (!lastMessage) continue;
-
-    const existing = await getThreadSummary(thread.id);
-    if (
-      !existing ||
-      existing.lastMessageTimestamp !== lastMessage.createdTimestamp
-    ) {
-      const transcript: TranscriptMessage[] = messages.map((message) => ({
-        user: message.author.username,
-        content: message.content,
-      }));
-
-      const aiSummary = await summarizeThread(thread.name, transcript);
-
-      await upsertThreadSummary(
-        thread.id,
-        thread.name,
-        JSON.stringify(transcript),
-        aiSummary,
-        lastMessage.createdTimestamp,
-      );
+    if (!threadData.hasChanges) {
+      verboseLog("Skipping (no new messages)");
+      verboseGroupEnd();
+      continue;
     }
+
+    verboseLog(`Fetched ${threadData.transcript.length} messages`);
+    const summaryLabel = VERBOSE_LOG
+      ? "Summarizing"
+      : `Summarizing "${threadData.threadName}"`;
+    console.log(summaryLabel);
+    const aiSummary = await summarizeThread(
+      threadData.threadName,
+      threadData.transcript,
+    );
+
+    await upsertThreadSummary(
+      threadData.threadId,
+      threadData.threadName,
+      JSON.stringify(threadData.transcript),
+      aiSummary,
+      threadData.lastMessageTimestamp,
+    );
+    verboseGroupEnd();
   }
 }

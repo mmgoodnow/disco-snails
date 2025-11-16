@@ -19,7 +19,6 @@ export async function summarizeThread(
   title: string,
   messages: TranscriptMessage[],
 ) {
-  console.log("Summarizing", title);
   const transcript = messages
     .map((message) => `${message.user}:\n${indented(message.content)}\n`)
     .join("");
@@ -38,7 +37,7 @@ I am the primary developer and don't have time to read these threads. Summarize 
 - What was the final resolution (or current status)?
 - What improvements could we make to the docs or the app that would help? (0 to 1 improvements only)
 
-Return 3-6 bullet points.
+Return 3-4 CONCISE notes formatted as HTML with <h4> and <p> tags.
 `;
 
   const res = await openai.chat.completions.create({

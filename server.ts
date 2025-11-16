@@ -163,6 +163,9 @@ function renderPage(rows: ThreadSummaryRow[]) {
             border-color: #334155;
             background: #0f172a;
           }
+          h3 {
+            color: #e2e8f0;
+          }
         }
       </style>
     </head>
