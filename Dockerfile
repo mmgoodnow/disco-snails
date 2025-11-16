@@ -18,8 +18,8 @@ WORKDIR /config
 COPY --from=builder /tmp/disco-snails /usr/local/bin/disco-snails
 
 ENV NODE_ENV=production \
-    PORT=3000
+    PORT=80
 
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["/usr/local/bin/disco-snails"]
