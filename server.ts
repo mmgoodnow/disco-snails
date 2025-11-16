@@ -1,6 +1,8 @@
 import { listThreadSummaries, type ThreadSummaryRow } from "./db";
 import type { TranscriptMessage } from "./summarizer";
 
+const WEB_API_KEY = process.env.WEB_API_KEY;
+
 function escapeHtml(input: string) {
   return input
     .replace(/&/g, "&amp;")
@@ -181,7 +183,15 @@ function renderPage(rows: ThreadSummaryRow[]) {
 export function startServer(port: number) {
   const server = Bun.serve({
     port,
-    async fetch() {
+    async fetch(req) {
+      if (WEB_API_KEY) {
+        const { searchParams } = new URL(req.url);
+        const providedKey = searchParams.get("apikey");
+        if (providedKey !== WEB_API_KEY) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+      }
+
       const rows = await listThreadSummaries();
       const html = renderPage(rows);
       return new Response(html, {
