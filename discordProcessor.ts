@@ -112,6 +112,7 @@ async function* streamThreadTranscripts(
     type: "public",
     limit: lookback,
   });
+
   verboseLog(`Fetched ${archived.threads.size} archived threads`);
 
   for (const [, thread] of archived.threads) {
