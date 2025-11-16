@@ -6,11 +6,12 @@ COPY package.json bun.lock ./
 RUN bun install --ci
 
 COPY . .
-RUN bun build ./index.ts --compile --target bun-linux-x64-musl --outfile /tmp/disco-snails
+RUN bun build ./index.ts --compile --outfile /tmp/disco-snails
 
-FROM alpine:3.20 AS runner
+FROM debian:bookworm-slim AS runner
 
-RUN apk add --no-cache ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /config
 
