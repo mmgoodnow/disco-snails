@@ -138,11 +138,11 @@ I am the primary developer and don't have time to read these threads. Summarize 
 - What was the final resolution (or current status)?
 - What improvements could we make to the docs or the app that would help? (0 to 1 improvements only)
 
-Return 3-6 bullet points.
+Return ~200 words formatted as HTML with headings starting at h4.
 `;
 
   const res = await openai.chat.completions.create({
-    model: "gpt-5-nano",
+    model: "gpt-5.1",
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -188,6 +188,7 @@ async function processThreads() {
 }
 
 setInterval(processThreads, ms("1 day"));
+processThreads();
 
 type TranscriptMessage = {
   user: string;
@@ -204,22 +205,12 @@ function escapeHtml(input: string) {
 }
 
 function renderAiSummary(summary: string) {
-  const items = summary
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) =>
-      line.startsWith("-") || line.startsWith("•")
-        ? line.replace(/^[-•]+\s*/, "")
-        : line,
-    );
-
-  if (items.length === 0) {
+  const trimmed = summary?.trim();
+  if (!trimmed) {
     return "<p>No AI summary available.</p>";
   }
 
-  const bullets = items.map((line) => `<li>${escapeHtml(line)}</li>`).join("");
-  return `<ul>${bullets}</ul>`;
+  return trimmed;
 }
 
 function renderTranscript(transcriptJson: string) {
