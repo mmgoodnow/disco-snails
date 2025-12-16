@@ -3,6 +3,16 @@ import type { TranscriptMessage } from "./summarizer";
 
 const WEB_API_KEY = process.env.WEB_API_KEY;
 
+function parseTranscript(transcriptJson: string): TranscriptMessage[] {
+  try {
+    const parsed = JSON.parse(transcriptJson);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("Failed to parse transcript JSON", err);
+    return [];
+  }
+}
+
 function escapeHtml(input: string) {
   return input
     .replace(/&/g, "&amp;")
@@ -22,26 +32,21 @@ function renderAiSummary(summary: string) {
 }
 
 function renderTranscript(transcriptJson: string) {
-  try {
-    const transcript = JSON.parse(transcriptJson) as TranscriptMessage[];
-    if (!Array.isArray(transcript) || transcript.length === 0) {
-      return "<p>No transcript captured.</p>";
-    }
+  const transcript = parseTranscript(transcriptJson);
+  if (transcript.length === 0) {
+    return "<p>No transcript captured.</p>";
+  }
 
-    return transcript
-      .map(
-        (entry) => `
+  return transcript
+    .map(
+      (entry) => `
         <article class="message">
           <header>${escapeHtml(entry.user)}</header>
           <pre>${escapeHtml(entry.content ?? "")}</pre>
         </article>
       `,
-      )
-      .join("");
-  } catch (err) {
-    console.error("Failed to parse transcript JSON", err);
-    return `<pre>${escapeHtml(transcriptJson)}</pre>`;
-  }
+    )
+    .join("");
 }
 
 function renderThread(row: ThreadSummaryRow) {
@@ -180,12 +185,36 @@ function renderPage(rows: ThreadSummaryRow[]) {
   </html>`;
 }
 
+function buildJsonFeed(rows: ThreadSummaryRow[], origin: string) {
+  return {
+    version: "https://jsonfeed.org/version/1",
+    title: "Discord Thread Summaries",
+    home_page_url: origin,
+    feed_url: `${origin}/feed.json`,
+    items: rows.map((row) => {
+      const summary = row.aiSummary?.trim();
+      return {
+        id: row.snowflake,
+        title: row.name,
+        url: `${origin}/?thread=${encodeURIComponent(row.snowflake)}`,
+        summary: summary || "No AI summary available.",
+        content_text: summary || "No AI summary available.",
+        date_published: new Date(row.lastMessageTimestamp).toISOString(),
+        date_modified: new Date(row.updatedAt).toISOString(),
+        transcript: parseTranscript(row.transcriptJson),
+      };
+    }),
+  };
+}
+
 export function startServer(port: number) {
   const server = Bun.serve({
     port,
     async fetch(req) {
+      const url = new URL(req.url);
+      const { pathname, searchParams, origin } = url;
+
       if (WEB_API_KEY) {
-        const { searchParams } = new URL(req.url);
         const providedKey = searchParams.get("apikey");
         if (providedKey !== WEB_API_KEY) {
           return new Response("Unauthorized", { status: 401 });
@@ -193,6 +222,14 @@ export function startServer(port: number) {
       }
 
       const rows = await listThreadSummaries();
+
+      if (pathname === "/feed.json") {
+        const feed = buildJsonFeed(rows, origin);
+        return new Response(JSON.stringify(feed, null, 2), {
+          headers: { "content-type": "application/feed+json; charset=utf-8" },
+        });
+      }
+
       const html = renderPage(rows);
       return new Response(html, {
         headers: { "content-type": "text/html; charset=utf-8" },
