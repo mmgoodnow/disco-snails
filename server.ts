@@ -41,13 +41,6 @@ function renderTranscriptHtmlForFeed(transcript: TranscriptMessage[]) {
   return `<h4>Messages</h4><ul>${list}</ul>`;
 }
 
-function renderTranscriptTextForFeed(transcript: TranscriptMessage[]) {
-  if (transcript.length === 0) return "No transcript captured.";
-  return transcript
-    .map((entry) => `${entry.user}: ${entry.content ?? ""}`.trim())
-    .join("\n");
-}
-
 function renderAiSummary(summary: string) {
   const trimmed = summary?.trim();
   if (!trimmed) {
@@ -236,7 +229,6 @@ function buildJsonFeed(
       const summaryText = stripHtml(summaryHtml);
       const transcript = parseTranscript(row.transcriptJson);
       const transcriptHtml = renderTranscriptHtmlForFeed(transcript);
-      const transcriptText = renderTranscriptTextForFeed(transcript);
       const summaryTextBlock = summaryText || "No AI summary available.";
       const summaryHtmlBlock = summaryHtml || "<p>No AI summary available.</p>";
       return {
@@ -244,7 +236,6 @@ function buildJsonFeed(
         title: row.name,
         url: `${origin}/?${itemParams.toString()}`,
         summary: summaryTextBlock,
-        content_text: `${summaryTextBlock}\n\n${transcriptText}`,
         content_html: `${summaryHtmlBlock}${transcriptHtml}`,
         date_published: new Date(row.lastMessageTimestamp).toISOString(),
         date_modified: new Date(row.updatedAt).toISOString(),
