@@ -22,6 +22,32 @@ function escapeHtml(input: string) {
     .replace(/'/g, "&#39;");
 }
 
+function stripHtml(input: string) {
+  if (!input) return "";
+  const withoutTags = input.replace(/<[^>]*>/g, " ");
+  return withoutTags.replace(/\s+/g, " ").trim();
+}
+
+function renderTranscriptHtmlForFeed(transcript: TranscriptMessage[]) {
+  if (transcript.length === 0) return "<p>No transcript captured.</p>";
+
+  const list = transcript
+    .map(
+      (entry) =>
+        `<li><strong>${escapeHtml(entry.user)}:</strong> ${escapeHtml(entry.content ?? "")}</li>`,
+    )
+    .join("");
+
+  return `<h4>Messages</h4><ul>${list}</ul>`;
+}
+
+function renderTranscriptTextForFeed(transcript: TranscriptMessage[]) {
+  if (transcript.length === 0) return "No transcript captured.";
+  return transcript
+    .map((entry) => `${entry.user}: ${entry.content ?? ""}`.trim())
+    .join("\n");
+}
+
 function renderAiSummary(summary: string) {
   const trimmed = summary?.trim();
   if (!trimmed) {
@@ -192,16 +218,23 @@ function buildJsonFeed(rows: ThreadSummaryRow[], origin: string) {
     home_page_url: origin,
     feed_url: `${origin}/feed.json`,
     items: rows.map((row) => {
-      const summary = row.aiSummary?.trim();
+      const summaryHtml = row.aiSummary?.trim();
+      const summaryText = stripHtml(summaryHtml);
+      const transcript = parseTranscript(row.transcriptJson);
+      const transcriptHtml = renderTranscriptHtmlForFeed(transcript);
+      const transcriptText = renderTranscriptTextForFeed(transcript);
+      const summaryTextBlock = summaryText || "No AI summary available.";
+      const summaryHtmlBlock = summaryHtml || "<p>No AI summary available.</p>";
       return {
         id: row.snowflake,
         title: row.name,
         url: `${origin}/?thread=${encodeURIComponent(row.snowflake)}`,
-        summary: summary || "No AI summary available.",
-        content_text: summary || "No AI summary available.",
+        summary: summaryTextBlock,
+        content_text: `${summaryTextBlock}\n\n${transcriptText}`,
+        content_html: `${summaryHtmlBlock}${transcriptHtml}`,
         date_published: new Date(row.lastMessageTimestamp).toISOString(),
         date_modified: new Date(row.updatedAt).toISOString(),
-        transcript: parseTranscript(row.transcriptJson),
+        transcript,
       };
     }),
   };
