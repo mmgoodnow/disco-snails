@@ -211,13 +211,27 @@ function renderPage(rows: ThreadSummaryRow[]) {
   </html>`;
 }
 
-function buildJsonFeed(rows: ThreadSummaryRow[], origin: string) {
+function buildJsonFeed(
+  rows: ThreadSummaryRow[],
+  origin: string,
+  apikey?: string | null,
+) {
+  const feedUrlParams = new URLSearchParams();
+  if (apikey) feedUrlParams.set("apikey", apikey);
+
+  const feedUrl = feedUrlParams.size
+    ? `${origin}/feed.json?${feedUrlParams.toString()}`
+    : `${origin}/feed.json`;
+
   return {
     version: "https://jsonfeed.org/version/1",
     title: "Discord Thread Summaries",
     home_page_url: origin,
-    feed_url: `${origin}/feed.json`,
+    feed_url: feedUrl,
     items: rows.map((row) => {
+      const itemParams = new URLSearchParams({ thread: row.snowflake });
+      if (apikey) itemParams.set("apikey", apikey);
+
       const summaryHtml = row.aiSummary?.trim();
       const summaryText = stripHtml(summaryHtml);
       const transcript = parseTranscript(row.transcriptJson);
@@ -228,7 +242,7 @@ function buildJsonFeed(rows: ThreadSummaryRow[], origin: string) {
       return {
         id: row.snowflake,
         title: row.name,
-        url: `${origin}/?thread=${encodeURIComponent(row.snowflake)}`,
+        url: `${origin}/?${itemParams.toString()}`,
         summary: summaryTextBlock,
         content_text: `${summaryTextBlock}\n\n${transcriptText}`,
         content_html: `${summaryHtmlBlock}${transcriptHtml}`,
@@ -247,8 +261,9 @@ export function startServer(port: number) {
       const url = new URL(req.url);
       const { pathname, searchParams, origin } = url;
 
+      const providedKey = searchParams.get("apikey");
+
       if (WEB_API_KEY) {
-        const providedKey = searchParams.get("apikey");
         if (providedKey !== WEB_API_KEY) {
           return new Response("Unauthorized", { status: 401 });
         }
@@ -257,7 +272,7 @@ export function startServer(port: number) {
       const rows = await listThreadSummaries();
 
       if (pathname === "/feed.json") {
-        const feed = buildJsonFeed(rows, origin);
+        const feed = buildJsonFeed(rows, origin, providedKey);
         return new Response(JSON.stringify(feed, null, 2), {
           headers: { "content-type": "application/feed+json; charset=utf-8" },
         });
