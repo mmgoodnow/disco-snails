@@ -20,13 +20,6 @@ type McpContent = {
   text: string;
 };
 
-type McpResource = {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-};
-
 type SearchResult = {
   type: "channel" | "thread" | "message";
   id: string;
@@ -305,17 +298,6 @@ function buildSearchResults(
   return results.slice(0, limit);
 }
 
-function buildThreadSummaryResources(rows: ThreadSummaryRow[]): McpResource[] {
-  return rows.map((row) => ({
-    uri: threadUri(row.snowflake),
-    name: row.name,
-    description: `Stored Discord thread summary, updated ${new Date(
-      row.updatedAt,
-    ).toISOString()}`,
-    mimeType: "text/markdown",
-  }));
-}
-
 function renderThreadSummaryList(rows: ThreadSummaryRow[]) {
   return JSON.stringify(
     rows.map((row) => ({
@@ -471,7 +453,6 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
       return jsonRpcResult(id, {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {
-          resources: {},
           tools: {},
         },
         serverInfo: {
@@ -479,33 +460,6 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
           version: "0.1.0",
         },
       });
-
-    case "resources/list":
-      return jsonRpcResult(id, {
-        resources: buildThreadSummaryResources(rows),
-      });
-
-    case "resources/read": {
-      const uri = getStringParam(params, "uri");
-      if (!uri) {
-        return jsonRpcError(id, -32602, "resources/read requires a uri");
-      }
-
-      const row = findThreadByReadTarget(rows, uri);
-      if (!row) {
-        return jsonRpcError(id, -32004, `No resource found for ${uri}`);
-      }
-
-      return jsonRpcResult(id, {
-        contents: [
-          {
-            uri: threadUri(row.snowflake),
-            mimeType: "text/markdown",
-            text: renderStoredThreadSummaryMarkdown(row),
-          },
-        ],
-      });
-    }
 
     case "tools/list":
       return jsonRpcResult(id, {
@@ -583,7 +537,7 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
           {
             name: "list_thread_summaries",
             description:
-              "List locally stored thread summaries with resource URIs for discovery.",
+              "List locally stored thread summaries with thread URIs for discovery.",
             inputSchema: {
               type: "object",
               properties: {
