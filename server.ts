@@ -233,13 +233,13 @@ async function readDiscordForumThreads(channelId: string) {
 }
 
 async function listDiscordChannels() {
-  if (DISCORD_GUILD_ID) {
-    return discordApi<DiscordChannel[]>(`/guilds/${DISCORD_GUILD_ID}/channels`);
-  }
-
-  if (FORUM_CHANNEL_ID) {
-    return [await getDiscordChannel(FORUM_CHANNEL_ID)];
-  }
+  const guildId =
+    DISCORD_GUILD_ID ??
+    (FORUM_CHANNEL_ID
+      ? (await getDiscordChannel(FORUM_CHANNEL_ID)).guild_id
+      : undefined);
+  if (guildId)
+    return discordApi<DiscordChannel[]>(`/guilds/${guildId}/channels`);
 
   throw new Error(
     "DISCORD_GUILD_ID or DISCORD_FORUM_CHANNEL_ID must be set to list channels",
