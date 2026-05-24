@@ -257,6 +257,14 @@
   .further li { margin-bottom: 0.4rem; color: var(--muted); font-size: 0.93rem; }
   .further li a { color: var(--accent); }
 
+  table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: 0.9rem; }
+  thead tr { border-bottom: 2px solid var(--border); }
+  th { text-align: left; padding: 0.4rem 0.75rem; color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { white-space: nowrap; color: var(--fg); }
+  td:first-child strong { color: var(--accent); }
+
   @media (max-width: 900px) {
     nav { display: none; }
     main { padding: 2rem 1.25rem; }
@@ -282,6 +290,8 @@
     <li><a href="#ch10"><span class="num">10.</span> Lifetimes</a></li>
     <li><a href="#ch11"><span class="num">11.</span> Modules</a></li>
     <li><a href="#ch12"><span class="num">12.</span> A request end-to-end</a></li>
+    <li><a href="#ch13"><span class="num">13.</span> Cargo &amp; the ecosystem</a></li>
+    <li><a href="#ch14"><span class="num">14.</span> Popular crates</a></li>
     <li><a href="#further"><span class="num">→</span> Where to go next</a></li>
   </ol>
 </nav>
@@ -715,6 +725,180 @@ In JavaScript, <code>Promise</code> execution starts immediately on creation. In
 <p><code>serde_json::to_string(&amp;responses[0])</code> — <code>Value</code> implements <code>Serialize</code>, so this is a single function call. Wrapped in an axum <code>Response</code> with the appropriate content-type header.</p>
 
 <p>The entire path is synchronous-looking but fully async. Every <code>.await</code> is a point where the tokio executor can run other tasks — other HTTP requests, the background processor timer — while waiting on I/O.</p>
+</section>
+
+<hr>
+
+<!-- CH 13 -->
+<section class="chapter" id="ch13">
+<h2><span class="ch-num">13</span> Cargo &amp; the ecosystem</h2>
+
+<p>Cargo is Rust's build tool, package manager, test runner, doc generator, and benchmark harness — all one command. There's no npm/webpack split; the whole build is a single mental model.</p>
+
+<h3>Cargo.toml</h3>
+<p>The manifest lives at the repo root. Here's the disco-snails one, annotated:</p>
+
+<pre><span class="lang-tag">toml · Cargo.toml</span><code><span class="cm">[package]</span>
+<span class="kw">name</span> = <span class="st">"disco-snails"</span>
+<span class="kw">version</span> = <span class="st">"0.1.0"</span>
+<span class="kw">edition</span> = <span class="st">"2021"</span>     <span class="comment"># language edition; 2021 is the current stable one</span>
+
+<span class="cm">[[bin]]</span>              <span class="comment"># double brackets = array; one entry per binary</span>
+<span class="kw">name</span> = <span class="st">"disco-snails"</span>
+<span class="kw">path</span> = <span class="st">"src/main.rs"</span>
+
+<span class="cm">[dependencies]</span>
+<span class="kw">tokio</span> = { <span class="kw">version</span> = <span class="st">"1"</span>, <span class="kw">features</span> = [<span class="st">"full"</span>] }
+<span class="kw">axum</span>  = { <span class="kw">version</span> = <span class="st">"0.8"</span>, <span class="kw">features</span> = [<span class="st">"json"</span>] }
+<span class="kw">sqlx</span>  = { <span class="kw">version</span> = <span class="st">"0.8"</span>, <span class="kw">features</span> = [<span class="st">"sqlite"</span>, <span class="st">"runtime-tokio"</span>] }
+
+<span class="cm">[dev-dependencies]</span>  <span class="comment"># only compiled for `cargo test`</span>
+<span class="kw">axum-test</span> = <span class="st">"20"</span>
+<span class="kw">tempfile</span>  = <span class="st">"3"</span></code></pre>
+
+<p><strong>Features</strong> are opt-in capability flags inside a crate. <code>tokio = { features = ["full"] }</code> enables all of tokio (timers, I/O, the macros, etc.). <code>reqwest = { default-features = false, features = ["rustls-tls"] }</code> strips the default OpenSSL dep and uses the pure-Rust TLS implementation instead — important for musl/Docker builds.</p>
+
+<h3>The key commands</h3>
+
+<pre><span class="lang-tag">shell</span><code><span class="comment"># build + run (debug, incremental, fast)</span>
+cargo run
+
+<span class="comment"># optimized release binary (slow first compile, fast binary)</span>
+cargo build --release
+
+<span class="comment"># run all tests</span>
+cargo test
+
+<span class="comment"># run only the db module's tests</span>
+cargo test db::
+
+<span class="comment"># lint with suggestions</span>
+cargo clippy
+
+<span class="comment"># format in place</span>
+cargo fmt
+
+<span class="comment"># open local docs for all deps at your exact versions</span>
+cargo doc --open
+
+<span class="comment"># audit your dependency tree for known CVEs</span>
+cargo audit
+
+<span class="comment"># show what's taking so long to compile</span>
+cargo build --timings</code></pre>
+
+<h3>Cargo.lock</h3>
+<p>Like <code>package-lock.json</code> but for the whole build. Commit it for binaries (you want reproducible builds), omit it for libraries (you want dependents to pick their own versions). disco-snails is a binary, so it's committed.</p>
+
+<h3>crates.io</h3>
+<p>The central registry. Every <code>cargo add</code> or <code>Cargo.toml</code> dependency resolves through it by default. Docs auto-publish to <a href="https://docs.rs" target="_blank">docs.rs</a> on every crate version — so <a href="https://docs.rs/axum/latest" target="_blank">docs.rs/axum</a> shows fully rendered API docs for the exact version you're using, with source links.</p>
+
+<h3>Workspaces</h3>
+<p>A workspace is a multi-crate repo under one <code>Cargo.toml</code>. All crates share a single <code>Cargo.lock</code> and a single <code>target/</code> directory. disco-snails is a single-crate repo (no workspace), which is the right call at this size. You'd add a workspace if you split out e.g. a shared <code>disco-snails-types</code> crate.</p>
+
+<div class="callout ts">npm has package.json + package-lock.json + node_modules + a separate bundler + a separate type-checker + a separate linter. Cargo is all of those in one tool with one config file. The tradeoff: compile times are long on a cold cache.</div>
+</section>
+
+<hr>
+
+<!-- CH 14 -->
+<section class="chapter" id="ch14">
+<h2><span class="ch-num">14</span> Popular crates</h2>
+
+<p>The crates in disco-snails are a reasonable cross-section of the async Rust ecosystem. Here's the landscape, including what's in this project and what you'd reach for next.</p>
+
+<h3>HTTP servers</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>axum</strong> ✓</td><td>From the tokio team. Router-based, extractors compose cleanly, integrates with tower middleware. The current go-to for new projects.</td></tr>
+<tr><td>actix-web</td><td>Actor-based, very fast benchmarks, larger API surface. Popular but heavier.</td></tr>
+<tr><td>warp</td><td>Filter-combinator style. Elegant for small APIs, can get complex at scale.</td></tr>
+</tbody>
+</table>
+
+<h3>Async runtime</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>tokio</strong> ✓</td><td>The dominant async runtime. Multi-threaded work-stealing scheduler, async I/O, timers, channels. axum, reqwest, sqlx, and async-openai all run on it.</td></tr>
+<tr><td>async-std</td><td>Alternative runtime, mirrors std's API surface. Less ecosystem adoption than tokio.</td></tr>
+<tr><td>smol</td><td>Minimal runtime. Good for embedded/WASM contexts.</td></tr>
+</tbody>
+</table>
+
+<h3>HTTP client</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>reqwest</strong> ✓</td><td>The standard async HTTP client. Wraps hyper, supports JSON via serde, streaming, multipart. Use <code>default-features = false, features = ["rustls-tls"]</code> to avoid OpenSSL.</td></tr>
+<tr><td>ureq</td><td>Synchronous, zero-async-overhead. Great for CLI tools or scripts that don't need async.</td></tr>
+<tr><td>hyper</td><td>The low-level HTTP/1+2 library that reqwest wraps. Use directly if you need maximum control.</td></tr>
+</tbody>
+</table>
+
+<h3>Serialization</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>serde</strong> ✓</td><td>The universal serialization framework. Provides the <code>Serialize</code>/<code>Deserialize</code> traits; format crates plug in.</td></tr>
+<tr><td><strong>serde_json</strong> ✓</td><td>JSON format for serde. The <code>json!</code> macro builds <code>Value</code>s inline; <code>from_str</code>/<code>to_string</code> for I/O.</td></tr>
+<tr><td>toml</td><td>TOML format. Used by Cargo itself for Cargo.toml.</td></tr>
+<tr><td>serde_yaml</td><td>YAML format. Avoid if you can — YAML has too many edge cases.</td></tr>
+</tbody>
+</table>
+
+<h3>Databases</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>sqlx</strong> ✓</td><td>Async SQL with compile-time query checking (via the <code>query!</code> macro and an offline cache). Supports SQLite, Postgres, MySQL. disco-snails uses <code>query_as!</code>-style runtime queries.</td></tr>
+<tr><td>diesel</td><td>Sync ORM with a rich query DSL. Better for complex relational schemas; needs a separate async wrapper (diesel-async).</td></tr>
+<tr><td>sea-orm</td><td>Async ORM built on sqlx. More Rails-like if you want active-record-style models.</td></tr>
+</tbody>
+</table>
+
+<h3>Error handling</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>anyhow</strong> ✓</td><td>For application code. <code>anyhow::Error</code> wraps any error type; <code>.context("...")</code> adds human-readable context; <code>?</code> propagates. Use this in binaries.</td></tr>
+<tr><td><strong>thiserror</strong> ✓</td><td>For library code. <code>#[derive(thiserror::Error)]</code> generates <code>Display</code> and <code>From</code> impls from an enum. Use this when callers need to match on error variants.</td></tr>
+<tr><td>eyre</td><td>anyhow fork with richer error reports (color-eyre adds backtraces and spantrace).</td></tr>
+</tbody>
+</table>
+
+<h3>Observability</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>tracing</strong> ✓</td><td>Structured, async-aware logging. The <code>tracing::info!</code> / <code>warn!</code> / <code>error!</code> macros accept key-value fields. Spans track async context across <code>.await</code> points where a thread-local logger would lose context.</td></tr>
+<tr><td><strong>tracing-subscriber</strong> ✓</td><td>Wires tracing events to an output. <code>tracing_subscriber::fmt::init()</code> is the one-liner that prints to stderr. Swap for a JSON subscriber to emit structured logs.</td></tr>
+</tbody>
+</table>
+
+<h3>CLI tools</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>clap</td><td>The standard CLI argument parser. <code>#[derive(Parser)]</code> generates help text and parsing from a struct. Would replace the <code>env()</code> calls in main if this were a CLI tool rather than a daemon.</td></tr>
+<tr><td>indicatif</td><td>Progress bars and spinners for terminal output.</td></tr>
+<tr><td>colored</td><td>ANSI color helpers for terminal output.</td></tr>
+</tbody>
+</table>
+
+<h3>Testing</h3>
+<table>
+<thead><tr><th>Crate</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>axum-test</strong> ✓</td><td>Spins up an in-process axum router and lets you make HTTP calls against it. No real network, but full request/response cycle including middleware and extractors.</td></tr>
+<tr><td><strong>tempfile</strong> ✓</td><td>Creates temp files/dirs that delete themselves on drop. Used in db tests to give each test an isolated SQLite file.</td></tr>
+<tr><td>mockall</td><td>Generates mock implementations of traits. Useful when you want to test code that calls Discord/OpenAI without hitting the network.</td></tr>
+<tr><td>insta</td><td>Snapshot testing — <code>assert_snapshot!(value)</code> writes the first run, diffs on subsequent runs. Good for testing rendered HTML or JSON responses.</td></tr>
+</tbody>
+</table>
+
+<div class="callout ts">The npm registry has ~3M packages; crates.io has ~170K. Smaller, but the signal-to-noise ratio is much higher — the ecosystem hasn't had time to accumulate five competing half-finished JSON parsers. For most problem domains there's a clear community consensus pick (reqwest, sqlx, tokio, serde). The <a href="https://blessed.rs/crates" target="_blank">blessed.rs</a> list is a curated guide to those consensus choices.</div>
 </section>
 
 <hr>
