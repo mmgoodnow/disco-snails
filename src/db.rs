@@ -27,6 +27,13 @@ pub async fn open_db(path: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
+    // Migrate: add columns that may be absent in DBs created by the old TS app
+    for col in &[
+        "ALTER TABLE thread_summaries ADD COLUMN ai_summary TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE thread_summaries ADD COLUMN transcript_json TEXT NOT NULL DEFAULT ''",
+    ] {
+        let _ = sqlx::query(col).execute(&pool).await; // ignore "duplicate column" errors
+    }
     Ok(pool)
 }
 
