@@ -85,6 +85,16 @@ function stripHtml(input: string) {
   return withoutTags.replace(/\s+/g, " ").trim();
 }
 
+function getProvidedWebApiKey(req: Request, searchParams: URLSearchParams) {
+  const bearerPrefix = "Bearer ";
+  const authorization = req.headers.get("authorization");
+  if (authorization?.startsWith(bearerPrefix)) {
+    return authorization.slice(bearerPrefix.length);
+  }
+
+  return searchParams.get("apikey");
+}
+
 function getStringParam(params: unknown, key: string) {
   if (!params || typeof params !== "object") return undefined;
   const value = (params as Record<string, unknown>)[key];
@@ -966,7 +976,7 @@ export function startServer(port: number) {
       const url = new URL(req.url);
       const { pathname, searchParams, origin } = url;
 
-      const providedKey = searchParams.get("apikey");
+      const providedKey = getProvidedWebApiKey(req, searchParams);
 
       if (WEB_API_KEY) {
         if (providedKey !== WEB_API_KEY) {
