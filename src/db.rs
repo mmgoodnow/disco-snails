@@ -27,12 +27,38 @@ pub async fn open_db(path: &str) -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
-    // Migrate: add columns that may be absent in DBs created by the old TS app
-    for col in &[
-        "ALTER TABLE thread_summaries ADD COLUMN ai_summary TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE thread_summaries ADD COLUMN transcript_json TEXT NOT NULL DEFAULT ''",
-    ] {
-        let _ = sqlx::query(col).execute(&pool).await; // ignore "duplicate column" errors
+    // Migrate: rename camelCase columns from the old TS app to snake_case.
+    // SQLite doesn't support ALTER TABLE RENAME COLUMN before 3.25.0, so we
+    // recreate the table if the old column names are present.
+    let has_camel: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pragma_table_info('thread_summaries') WHERE name = 'aiSummary'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap_or(0i64) > 0;
+    if has_camel {
+        sqlx::query(
+            "CREATE TABLE thread_summaries_new (
+                snowflake                TEXT PRIMARY KEY,
+                name                     TEXT NOT NULL,
+                transcript_json          TEXT NOT NULL,
+                ai_summary               TEXT NOT NULL,
+                last_message_timestamp   INTEGER NOT NULL,
+                updated_at               INTEGER NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query(
+            "INSERT INTO thread_summaries_new
+                 (snowflake, name, transcript_json, ai_summary, last_message_timestamp, updated_at)
+             SELECT snowflake, name, transcriptJson, aiSummary, lastMessageTimestamp, updatedAt
+             FROM thread_summaries",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::query("DROP TABLE thread_summaries").execute(&pool).await?;
+        sqlx::query("ALTER TABLE thread_summaries_new RENAME TO thread_summaries").execute(&pool).await?;
     }
     Ok(pool)
 }
