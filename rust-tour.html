@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust Through disco-snails</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3e;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --accent: #7c6af7;
+    --accent-dim: #3d3466;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --teal: #2dd4bf;
+    --yellow: #fbbf24;
+    --code-bg: #141720;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 2rem 0;
+  }
+
+  nav .logo {
+    padding: 0 1.5rem 1.5rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  nav ol {
+    list-style: none;
+    padding: 0;
+  }
+
+  nav ol li a {
+    display: block;
+    padding: 0.45rem 1.5rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  nav ol li a:hover,
+  nav ol li a.active {
+    color: var(--text);
+    border-left-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  nav ol li a .num {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 0.4em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  main {
+    flex: 1;
+    max-width: 780px;
+    padding: 4rem 3rem;
+  }
+
+  /* Typography */
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .chapter {
+    margin-bottom: 5rem;
+    scroll-margin-top: 2rem;
+  }
+
+  h2 {
+    font-size: 1.55rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  h2 .ch-num {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--teal);
+    margin: 1.8rem 0 0.6rem;
+  }
+
+  p { margin-bottom: 1rem; color: var(--text); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Code */
+  code {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.875em;
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    color: var(--orange);
+    border: 1px solid var(--border);
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1.25rem 0;
+    position: relative;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text);
+    font-size: 0.875rem;
+    line-height: 1.65;
+  }
+
+  .lang-tag {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.7rem;
+    font-family: "SF Mono", monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Syntax highlight tokens */
+  .kw { color: #c792ea; }       /* keywords */
+  .ty { color: #82b1ff; }       /* types */
+  .fn { color: #82aaff; }       /* function names */
+  .st { color: #c3e88d; }       /* strings */
+  .cm { color: #546e7a; font-style: italic; } /* comments */
+  .nm { color: var(--orange); } /* numbers / literals */
+  .mc { color: #ff5370; }       /* macros */
+  .at { color: var(--teal); }   /* attributes / derives */
+  .lf { color: var(--yellow); } /* lifetimes */
+  .op { color: #89ddff; }       /* operators / punctuation */
+  .tr { color: var(--teal); }   /* trait names */
+
+  /* Callout boxes */
+  .callout {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border-left: 3px solid;
+    font-size: 0.93rem;
+  }
+  .callout.ts {
+    background: #1a2035;
+    border-color: #4a90e2;
+  }
+  .callout.ts::before {
+    content: "TypeScript equivalent";
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4a90e2;
+    margin-bottom: 0.5rem;
+  }
+  .callout.note {
+    background: #1a2520;
+    border-color: var(--green);
+  }
+  .callout.note::before {
+    content: "Note";
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    margin-bottom: 0.5rem;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 3rem 0;
+  }
+
+  /* Further reading */
+  .further {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .further h3 { margin-top: 0; }
+  .further ul { padding-left: 1.25rem; }
+  .further li { margin-bottom: 0.4rem; color: var(--muted); font-size: 0.93rem; }
+  .further li a { color: var(--accent); }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { padding: 2rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <div class="logo">Rust Through<br>disco-snails</div>
+  <ol>
+    <li><a href="#intro"><span class="num">0.</span> Introduction</a></li>
+    <li><a href="#ch1"><span class="num">1.</span> Ownership &amp; borrowing</a></li>
+    <li><a href="#ch2"><span class="num">2.</span> String vs &amp;str</a></li>
+    <li><a href="#ch3"><span class="num">3.</span> Option&lt;T&gt; — no null</a></li>
+    <li><a href="#ch4"><span class="num">4.</span> Result&lt;T&gt; and ?</a></li>
+    <li><a href="#ch5"><span class="num">5.</span> Arc&lt;T&gt; — shared ownership</a></li>
+    <li><a href="#ch6"><span class="num">6.</span> #[derive(…)]</a></li>
+    <li><a href="#ch7"><span class="num">7.</span> match</a></li>
+    <li><a href="#ch8"><span class="num">8.</span> async / await</a></li>
+    <li><a href="#ch9"><span class="num">9.</span> Iterators &amp; closures</a></li>
+    <li><a href="#ch10"><span class="num">10.</span> Lifetimes</a></li>
+    <li><a href="#ch11"><span class="num">11.</span> Modules</a></li>
+    <li><a href="#ch12"><span class="num">12.</span> A request end-to-end</a></li>
+    <li><a href="#further"><span class="num">→</span> Where to go next</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<h1>Rust Through disco-snails</h1>
+<p class="subtitle">Every example is from code you already wrote and shipped.</p>
+
+<!-- INTRO -->
+<section class="chapter" id="intro">
+<p>This is not a general Rust tutorial. It's a tour of the concepts that appear in <strong>disco-snails</strong> — a Discord thread summarizer you rewrote from TypeScript/Bun into Rust. The goal is to give you mental models for the things you'll encounter most when reading and extending this specific codebase.</p>
+<p>Chapters follow the code roughly in the order a new Rust concept appears, not in order of difficulty.</p>
+</section>
+
+<hr>
+
+<!-- CH 1 -->
+<section class="chapter" id="ch1">
+<h2><span class="ch-num">1</span> Ownership &amp; borrowing</h2>
+
+<p>Rust's ownership system has one core rule: every value has exactly one owner at a time. When the owner goes out of scope, the value is freed — no garbage collector required.</p>
+
+<p>In practice, most of the time you're not <em>moving</em> values — you're <em>borrowing</em> them. A <code>&amp;T</code> is a shared (read-only) borrow. The compiler proves at compile time that borrows don't outlive the thing they're borrowing from.</p>
+
+<p>Almost every function in this codebase takes references:</p>
+
+<pre><span class="lang-tag">rust · db.rs</span><code><span class="kw">pub async fn</span> <span class="fn">get_thread_summary</span>(
+    pool: <span class="op">&amp;</span><span class="ty">SqlitePool</span>,
+    snowflake: <span class="op">&amp;</span><span class="ty">str</span>,
+) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">Option</span><span class="op">&lt;</span><span class="ty">ThreadSummaryRow</span><span class="op">&gt;&gt;</span></code></pre>
+
+<p><code>&amp;SqlitePool</code> means "borrow the pool, don't take ownership." <code>&amp;str</code> means "borrow a string slice." Neither function <em>owns</em> the pool or the string — they just read from them. The caller still owns both after the call returns.</p>
+
+<div class="callout ts">TypeScript just passes arguments. The runtime keeps everything alive via garbage collection. Rust has no GC — the compiler instead proves statically that borrowed values outlive their borrows. If they don't, it's a compile error, not a crash.</div>
+
+<p>The practical upshot: you'll write <code>&amp;</code> a lot on function parameters. If you see a compile error about "does not live long enough" or "borrow of moved value," that's the ownership checker talking.</p>
+</section>
+
+<!-- CH 2 -->
+<section class="chapter" id="ch2">
+<h2><span class="ch-num">2</span> String vs &amp;str</h2>
+
+<p>Rust has two string types, and the distinction matters.</p>
+
+<ul style="margin: 0.75rem 0 1rem 1.5rem;">
+  <li style="margin-bottom: 0.5rem"><code>&amp;str</code> — a borrowed string slice. A reference to bytes that already exist somewhere. Immutable. Function parameters are almost always <code>&amp;str</code>.</li>
+  <li><code>String</code> — an owned, heap-allocated, growable string. You produce one when you need to store or build a string.</li>
+</ul>
+
+<p>The pattern appears constantly in this codebase:</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code><span class="kw">pub fn</span> <span class="fn">new</span>(token: <span class="kw">impl</span> <span class="tr">Into</span><span class="op">&lt;</span><span class="ty">String</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ty">Self</span> {
+    <span class="ty">Self</span> { http: <span class="ty">Client</span>::<span class="fn">new</span>(), token: token.<span class="fn">into</span>() }
+}</code></pre>
+
+<p><code>impl Into&lt;String&gt;</code> means "accept anything that converts into a String" — both a <code>String</code> and a <code>&amp;str</code> satisfy this. Calling <code>.into()</code> converts it and stores it. This is why you can write:</p>
+
+<pre><span class="lang-tag">rust</span><code><span class="ty">DiscordClient</span>::<span class="fn">new</span>(<span class="st">"fake"</span>)          <span class="cm">// &amp;str literal — works</span>
+<span class="ty">DiscordClient</span>::<span class="fn">new</span>(<span class="op">&amp;</span>bot_token)         <span class="cm">// &amp;String — works</span>
+<span class="ty">DiscordClient</span>::<span class="fn">new</span>(bot_token.<span class="fn">clone</span>())  <span class="cm">// String — works</span></code></pre>
+
+<p>Inside the struct, <code>token: String</code> is an owned value. The <code>DiscordClient</code> owns its token for its entire lifetime — when the client is dropped, the string is freed.</p>
+
+<div class="callout note">When writing new functions, default to <code>&amp;str</code> for string parameters and <code>String</code> for struct fields. If a function needs to store a string beyond its own scope, it needs ownership — take <code>String</code> or <code>impl Into&lt;String&gt;</code>.</div>
+</section>
+
+<!-- CH 3 -->
+<section class="chapter" id="ch3">
+<h2><span class="ch-num">3</span> Option&lt;T&gt; — no null</h2>
+
+<p>Rust has no <code>null</code>, <code>undefined</code>, or surprise <code>None</code> at runtime. A value that might be absent has type <code>Option&lt;T&gt;</code>, which is either <code>Some(value)</code> or <code>None</code>. The compiler forces you to handle both cases before you can use the value.</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code><span class="kw">pub struct</span> <span class="ty">DiscordAuthor</span> {
+    <span class="kw">pub</span> username: <span class="ty">String</span>,
+    <span class="kw">pub</span> global_name: <span class="ty">Option</span><span class="op">&lt;</span><span class="ty">String</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ty">DiscordAuthor</span> {
+    <span class="kw">pub fn</span> <span class="fn">display_name</span>(<span class="op">&amp;</span>self) <span class="op">-&gt; &amp;</span><span class="ty">str</span> {
+        self.global_name.<span class="fn">as_deref</span>().<span class="fn">unwrap_or</span>(<span class="op">&amp;</span>self.username)
+    }
+}</code></pre>
+
+<p><code>global_name</code> is <code>Option&lt;String&gt;</code> because Discord users may or may not have a display name. <code>.as_deref()</code> converts <code>Option&lt;String&gt;</code> to <code>Option&lt;&amp;str&gt;</code> (borrowing the inner string), and <code>.unwrap_or()</code> provides the fallback. You cannot accidentally use a <code>None</code> as if it were a string — the type won't allow it.</p>
+
+<div class="callout ts">
+<pre><code>message.author?.global_name ?? message.author?.username ?? "Unknown user"</code></pre>
+The Rust version is more explicit, but the compiler guarantees exhaustive handling. In TypeScript you can forget the <code>??</code> fallback and get <code>undefined</code> at runtime.
+</div>
+
+<p><code>Option</code> also drives the database return types:</p>
+
+<pre><span class="lang-tag">rust · db.rs</span><code><span class="kw">pub async fn</span> <span class="fn">get_thread_summary</span>(
+    pool: <span class="op">&amp;</span><span class="ty">SqlitePool</span>,
+    snowflake: <span class="op">&amp;</span><span class="ty">str</span>,
+) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">Option</span><span class="op">&lt;</span><span class="ty">ThreadSummaryRow</span><span class="op">&gt;&gt;</span></code></pre>
+
+<p>This returns <code>Ok(Some(row))</code> if found, <code>Ok(None)</code> if not found, and <code>Err(...)</code> if the query failed. Three distinct states, all typed, all forced to be handled.</p>
+
+<h3>Common Option methods</h3>
+
+<pre><span class="lang-tag">rust</span><code>opt.<span class="fn">unwrap_or</span>(default)          <span class="cm">// value or default</span>
+opt.<span class="fn">unwrap_or_else</span>(<span class="op">||</span> expr)      <span class="cm">// value or computed default</span>
+opt.<span class="fn">map</span>(<span class="op">|</span>v<span class="op">|</span> transform(v))        <span class="cm">// transform the inner value if Some</span>
+opt.<span class="fn">as_deref</span>()                   <span class="cm">// Option&lt;String&gt; → Option&lt;&amp;str&gt;</span>
+opt.<span class="fn">is_some</span>() / opt.<span class="fn">is_none</span>()   <span class="cm">// boolean checks</span>
+<span class="kw">if let</span> <span class="ty">Some</span>(v) <span class="op">=</span> opt { ... }     <span class="cm">// destructure and use</span></code></pre>
+</section>
+
+<!-- CH 4 -->
+<section class="chapter" id="ch4">
+<h2><span class="ch-num">4</span> Result&lt;T&gt; and the ? operator</h2>
+
+<p>Rust has no exceptions. Fallible functions return <code>Result&lt;T, E&gt;</code>, which is either <code>Ok(value)</code> or <code>Err(error)</code>. You must handle both.</p>
+
+<p>The <code>?</code> operator is syntactic sugar for: "if this is an <code>Err</code>, return it immediately from the current function; otherwise unwrap the <code>Ok</code>." It makes error propagation cheap to write:</p>
+
+<pre><span class="lang-tag">rust · db.rs</span><code><span class="kw">pub async fn</span> <span class="fn">open_db</span>(path: <span class="op">&amp;</span><span class="ty">str</span>) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">SqlitePool</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> opts <span class="op">=</span> <span class="ty">SqliteConnectOptions</span>::<span class="fn">from_str</span>(path)<span class="op">?</span>  <span class="cm">// early return on err</span>
+        .<span class="fn">create_if_missing</span>(<span class="kw">true</span>);
+    <span class="kw">let</span> pool <span class="op">=</span> <span class="ty">SqlitePool</span>::<span class="fn">connect_with</span>(opts).<span class="kw">await</span><span class="op">?</span>; <span class="cm">// early return on err</span>
+    <span class="fn">sqlx::query</span>(<span class="st">"CREATE TABLE IF NOT EXISTS ..."</span>)
+        .<span class="fn">execute</span>(<span class="op">&amp;</span>pool).<span class="kw">await</span><span class="op">?</span>;                       <span class="cm">// early return on err</span>
+    <span class="ty">Ok</span>(pool)
+}</code></pre>
+
+<p>Each <code>?</code> is a potential early return. If everything succeeds, <code>Ok(pool)</code> is returned at the end.</p>
+
+<p>The <code>anyhow</code> crate (used throughout) provides a convenient <code>Result</code> type that accepts any error kind, so you don't need to define your own error enum for every module. <code>anyhow::Result&lt;T&gt;</code> is shorthand for <code>Result&lt;T, anyhow::Error&gt;</code>.</p>
+
+<p><code>.with_context()</code> adds a human-readable message to the error:</p>
+
+<pre><span class="lang-tag">rust · main.rs</span><code><span class="kw">fn</span> <span class="fn">env</span>(key: <span class="op">&amp;</span><span class="ty">str</span>) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">String</span><span class="op">&gt;</span> {
+    std::env::<span class="fn">var</span>(key).<span class="fn">with_context</span>(<span class="op">||</span> <span class="mc">format!</span>(<span class="st">"{key} is not set"</span>))
+}</code></pre>
+
+<p>When <code>main()</code> propagates this with <code>?</code>, the error message includes exactly which env var was missing. If you chain multiple <code>.with_context()</code> calls, anyhow builds a full error chain — the Rust equivalent of a stack trace for domain errors.</p>
+
+<div class="callout ts">
+<pre><code>// TypeScript — exceptions are invisible in the type signature
+async function openDb(path: string): Promise&lt;Pool&gt; {
+  // could throw, nothing in the type says so
+}</code></pre>
+In Rust, if a function can fail, <code>Result</code> is in the return type. You can't accidentally ignore an error — the compiler warns if you don't use a <code>Result</code> value.
+</div>
+</section>
+
+<!-- CH 5 -->
+<section class="chapter" id="ch5">
+<h2><span class="ch-num">5</span> Arc&lt;T&gt; — shared ownership across threads</h2>
+
+<p>The borrow checker enforces one owner per value, but sometimes multiple things genuinely need to share ownership — especially across async tasks. That's what <code>Arc&lt;T&gt;</code> (Atomically Reference Counted) is for.</p>
+
+<pre><span class="lang-tag">rust · main.rs</span><code><span class="kw">let</span> discord <span class="op">=</span> <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">DiscordClient</span>::<span class="fn">new</span>(<span class="op">&amp;</span>bot_token));
+
+<span class="kw">let</span> state <span class="op">=</span> <span class="ty">AppState</span> {
+    pool: <span class="ty">Arc</span>::<span class="fn">new</span>(pool.<span class="fn">clone</span>()),
+    discord: <span class="ty">Arc</span>::<span class="fn">clone</span>(<span class="op">&amp;</span>discord),  <span class="cm">// second pointer, same data</span>
+    <span class="op">..</span>.
+};
+
+<span class="cm">// HTTP server task holds one Arc</span>
+tokio::<span class="fn">spawn</span>(<span class="kw">async move</span> { axum::<span class="fn">serve</span>(listener, app).<span class="kw">await</span>.<span class="fn">unwrap</span>(); });
+
+<span class="cm">// Processor loop holds another Arc</span>
+<span class="kw">loop</span> {
+    processor::<span class="fn">process_threads</span>(<span class="op">&amp;</span>pool, <span class="op">&amp;</span>discord, <span class="op">..</span>).<span class="kw">await</span><span class="op">?</span>;
+    <span class="op">..</span>.
+}</code></pre>
+
+<p><code>Arc::new(x)</code> puts <code>x</code> on the heap and wraps it in a reference-counted pointer. <code>Arc::clone(&amp;discord)</code> doesn't copy the <code>DiscordClient</code> — it increments the reference count and returns another pointer to the same value. When the last <code>Arc</code> is dropped, the value is freed.</p>
+
+<div class="callout note">There's also <code>Rc&lt;T&gt;</code> (non-atomic reference counting) for single-threaded use. Since tokio tasks may run on multiple threads, we need <code>Arc</code>. The compiler will tell you if you try to send an <code>Rc</code> across a thread boundary — it simply won't compile.</div>
+
+<p>This is the Rust equivalent of passing an object reference in TypeScript. The difference is the sharing is explicit in the type — you can see from <code>Arc&lt;DiscordClient&gt;</code> that this value is shared — and it's provably thread-safe.</p>
+</section>
+
+<!-- CH 6 -->
+<section class="chapter" id="ch6">
+<h2><span class="ch-num">6</span> #[derive(…)] — free trait implementations</h2>
+
+<p>Traits are Rust's version of interfaces. Many common traits can be automatically generated by the compiler using <code>#[derive]</code>:</p>
+
+<pre><span class="lang-tag">rust · db.rs</span><code><span class="at">#[derive(Debug, Clone, sqlx::FromRow)]</span>
+<span class="kw">pub struct</span> <span class="ty">ThreadSummaryRow</span> {
+    <span class="kw">pub</span> snowflake: <span class="ty">String</span>,
+    <span class="kw">pub</span> name: <span class="ty">String</span>,
+    <span class="kw">pub</span> ai_summary: <span class="ty">String</span>,
+    <span class="kw">pub</span> last_message_timestamp: <span class="ty">i64</span>,
+    <span class="kw">pub</span> updated_at: <span class="ty">i64</span>,
+    <span class="kw">pub</span> transcript_json: <span class="ty">String</span>,
+}</code></pre>
+
+<ul style="margin: 0.75rem 0 1rem 1.5rem;">
+  <li style="margin-bottom: 0.5rem"><code>Debug</code> — enables <code>{:?}</code> formatting for logging and test output</li>
+  <li style="margin-bottom: 0.5rem"><code>Clone</code> — enables <code>.clone()</code> to deep-copy the struct</li>
+  <li><code>sqlx::FromRow</code> — teaches sqlx how to map a database row into this struct by matching column names to field names</li>
+</ul>
+
+<p>For the transcript message type:</p>
+
+<pre><span class="lang-tag">rust · summarizer.rs</span><code><span class="at">#[derive(Debug, Clone, Serialize, Deserialize)]</span>
+<span class="kw">pub struct</span> <span class="ty">TranscriptMessage</span> {
+    <span class="kw">pub</span> user: <span class="ty">String</span>,
+    <span class="kw">pub</span> content: <span class="ty">String</span>,
+}</code></pre>
+
+<p><code>Serialize</code> and <code>Deserialize</code> (from the <code>serde</code> crate) let you call <code>serde_json::to_string(&amp;msg)</code> and <code>serde_json::from_str::&lt;TranscriptMessage&gt;(s)</code> without writing any serialization code. Field names become JSON keys.</p>
+
+<p>The Discord structs use an attribute to handle a name mismatch:</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code><span class="at">#[derive(Debug, Clone, Deserialize)]</span>
+<span class="kw">pub struct</span> <span class="ty">DiscordChannel</span> {
+    <span class="kw">pub</span> id: <span class="ty">String</span>,
+    <span class="at">#[serde(rename = "type")]</span>   <span class="cm">// "type" is a keyword in Rust</span>
+    <span class="kw">pub</span> kind: <span class="ty">u8</span>,
+    <span class="op">..</span>.
+}</code></pre>
+
+<p><code>#[serde(rename = "type")]</code> tells serde to look for the key <code>"type"</code> in the JSON but store it in the field named <code>kind</code>. Without it, we'd have a naming conflict since <code>type</code> is a reserved keyword.</p>
+</section>
+
+<!-- CH 7 -->
+<section class="chapter" id="ch7">
+<h2><span class="ch-num">7</span> match — exhaustive pattern matching</h2>
+
+<p><code>match</code> is like a <code>switch</code> statement, except the compiler enforces that every possible case is handled. Miss a case and it won't compile.</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code><span class="kw">fn</span> <span class="fn">url_encode</span>(s: <span class="op">&amp;</span><span class="ty">str</span>) <span class="op">-&gt;</span> <span class="ty">String</span> {
+    s.<span class="fn">bytes</span>().<span class="fn">map</span>(<span class="op">|</span>b<span class="op">|</span> <span class="kw">match</span> b {
+        <span class="nm">b'A'</span><span class="op">..=</span><span class="nm">b'Z'</span> <span class="op">|</span> <span class="nm">b'a'</span><span class="op">..=</span><span class="nm">b'z'</span> <span class="op">|</span> <span class="nm">b'0'</span><span class="op">..=</span><span class="nm">b'9'</span>
+        <span class="op">|</span> <span class="nm">b'-'</span> <span class="op">|</span> <span class="nm">b'_'</span> <span class="op">|</span> <span class="nm">b'.'</span> <span class="op">|</span> <span class="nm">b'~'</span> <span class="op">=&gt;</span> (b <span class="kw">as</span> <span class="ty">char</span>).<span class="fn">to_string</span>(),
+        _ <span class="op">=&gt;</span> <span class="mc">format!</span>(<span class="st">"%{b:02X}"</span>),
+    }).<span class="fn">collect</span>()
+}</code></pre>
+
+<p><code>b'A'..=b'Z'</code> is a range pattern. <code>|</code> joins multiple patterns in one arm. <code>_</code> is the catch-all. Every possible <code>u8</code> value is covered.</p>
+
+<p>Where match really shines is on enums. The <code>DiscordUri</code> enum has three variants, and every place it's used must handle all three:</p>
+
+<pre><span class="lang-tag">rust · server.rs</span><code><span class="kw">enum</span> <span class="ty">DiscordUri</span> {
+    <span class="ty">Message</span> { channel_id: <span class="ty">String</span>, message_id: <span class="ty">String</span> },
+    <span class="ty">Channel</span> { channel_id: <span class="ty">String</span> },
+    <span class="ty">Thread</span>  { channel_id: <span class="ty">String</span> },
+}
+
+<span class="kw">match</span> parsed {
+    <span class="ty">DiscordUri</span>::<span class="ty">Message</span> { channel_id, message_id } <span class="op">=&gt;</span> { <span class="op">..</span>. }
+    <span class="ty">DiscordUri</span>::<span class="ty">Channel</span> { channel_id }             <span class="op">=&gt;</span> { <span class="op">..</span>. }
+    <span class="ty">DiscordUri</span>::<span class="ty">Thread</span>  { channel_id }             <span class="op">=&gt;</span> { <span class="op">..</span>. }
+}</code></pre>
+
+<p>If you added a fourth variant and forgot to handle it in any <code>match</code>, the compiler would refuse to build. TypeScript's <code>switch</code> on a discriminated union gives you a lint warning at best.</p>
+
+<p><code>if let</code> is a shorthand for matching one variant and ignoring the rest:</p>
+
+<pre><span class="lang-tag">rust</span><code><span class="kw">if let</span> <span class="ty">Some</span>(existing) <span class="op">=</span> <span class="fn">get_thread_summary</span>(pool, <span class="op">&amp;</span>thread.id).<span class="kw">await</span><span class="op">?</span> {
+    <span class="kw">if</span> existing.last_message_timestamp <span class="op">==</span> last_ts {
+        skipped <span class="op">+=</span> <span class="nm">1</span>;
+        <span class="kw">continue</span>;
+    }
+}</code></pre>
+</section>
+
+<!-- CH 8 -->
+<section class="chapter" id="ch8">
+<h2><span class="ch-num">8</span> async / await</h2>
+
+<p>Rust's async/await looks like JavaScript's, but there's one key difference: Rust async functions are <em>lazy</em>. Calling an async function does nothing until you <code>.await</code> it. There's no implicit scheduling.</p>
+
+<pre><span class="lang-tag">rust · processor.rs</span><code><span class="kw">pub async fn</span> <span class="fn">process_threads</span>(
+    pool: <span class="op">&amp;</span><span class="ty">SqlitePool</span>,
+    discord: <span class="op">&amp;</span><span class="ty">DiscordClient</span>,
+    <span class="op">..</span>.
+) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">()</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> thread_batches <span class="op">=</span> discord
+        .<span class="fn">fetch_thread_messages</span>(forum_channel_id, lookback)
+        .<span class="kw">await</span><span class="op">?</span>;  <span class="cm">// drive future to completion, propagate error</span>
+    <span class="op">..</span>.
+}</code></pre>
+
+<p>The <code>.await?</code> combines two things: <code>.await</code> drives the future to completion, and <code>?</code> propagates any error. It's the pattern for every fallible async call.</p>
+
+<p>The tokio runtime drives all futures. <code>#[tokio::main]</code> in <code>main.rs</code> is a macro that sets up the runtime:</p>
+
+<pre><span class="lang-tag">rust · main.rs</span><code><span class="at">#[tokio::main]</span>
+<span class="kw">async fn</span> <span class="fn">main</span>() <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span><span class="ty">()</span><span class="op">&gt;</span> { <span class="op">..</span>. }</code></pre>
+
+<p>Without it, there'd be nothing to execute the futures — calling an async function gives you a <code>Future</code> object, not a running task.</p>
+
+<p><code>tokio::spawn</code> runs something concurrently without awaiting it:</p>
+
+<pre><span class="lang-tag">rust · main.rs</span><code>tokio::<span class="fn">spawn</span>(<span class="kw">async move</span> {
+    axum::<span class="fn">serve</span>(listener, app).<span class="kw">await</span>.<span class="fn">unwrap</span>();
+});</code></pre>
+
+<p>This launches the HTTP server as a background task and immediately continues. <code>async move</code> means the closure captures its variables by ownership — required because spawned tasks may outlive the current scope.</p>
+
+<div class="callout ts">
+In JavaScript, <code>Promise</code> execution starts immediately on creation. In Rust, <code>Future</code> execution starts only when polled (i.e., awaited). This makes Rust async more predictable — nothing runs until you tell it to.
+</div>
+</section>
+
+<!-- CH 9 -->
+<section class="chapter" id="ch9">
+<h2><span class="ch-num">9</span> Iterators &amp; closures</h2>
+
+<p>Rust's iterator methods (<code>map</code>, <code>filter</code>, <code>collect</code>, <code>chain</code>, <code>flatten</code>, etc.) compile down to tight loops with no overhead. They're used heavily throughout this codebase.</p>
+
+<pre><span class="lang-tag">rust · processor.rs</span><code><span class="kw">let</span> transcript: <span class="ty">Vec</span><span class="op">&lt;</span><span class="ty">TranscriptMessage</span><span class="op">&gt;</span> <span class="op">=</span> messages.<span class="fn">iter</span>().<span class="fn">map</span>(<span class="op">|</span>m<span class="op">|</span> <span class="ty">TranscriptMessage</span> {
+    user: m.author.<span class="fn">as_ref</span>()
+        .<span class="fn">map</span>(<span class="op">|</span>a<span class="op">|</span> a.<span class="fn">display_name</span>().<span class="fn">to_string</span>())
+        .<span class="fn">unwrap_or_else</span>(<span class="op">||</span> <span class="st">"Unknown"</span>.<span class="fn">to_string</span>()),
+    content: m.content.<span class="fn">clone</span>(),
+}).<span class="fn">collect</span>();</code></pre>
+
+<p>Breaking it down:</p>
+<ul style="margin: 0.75rem 0 1rem 1.5rem;">
+  <li style="margin-bottom: 0.4rem"><code>.iter()</code> — borrows each element; gives <code>&amp;DiscordMessage</code></li>
+  <li style="margin-bottom: 0.4rem"><code>.map(|m| ...)</code> — transforms each element; <code>m</code> is the closure argument</li>
+  <li><code>.collect()</code> — drives the iterator to completion and gathers results into a <code>Vec</code>. The type annotation on the left tells Rust what to collect into.</li>
+</ul>
+
+<p>Chaining iterators — here, combining active and archived threads:</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code>active_here.<span class="fn">into_iter</span>().<span class="fn">chain</span>(archived.threads).<span class="fn">collect</span>()</code></pre>
+
+<p><code>.into_iter()</code> consumes the Vec (takes ownership). <code>.chain()</code> appends another iterator. <code>.collect()</code> materializes it into a new Vec.</p>
+
+<p>Flattening nested Vecs:</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code>r.messages
+    .<span class="fn">unwrap_or_default</span>()  <span class="cm">// Option&lt;Vec&lt;Vec&lt;T&gt;&gt;&gt; → Vec&lt;Vec&lt;T&gt;&gt;</span>
+    .<span class="fn">into_iter</span>()          <span class="cm">// Iterator&lt;Item=Vec&lt;T&gt;&gt;</span>
+    .<span class="fn">flatten</span>()            <span class="cm">// Iterator&lt;Item=T&gt;</span>
+    .<span class="fn">collect</span>()            <span class="cm">// Vec&lt;T&gt;</span></code></pre>
+
+<p>Closures use <code>|args| body</code> syntax. <code>|| expr</code> is a zero-argument closure (equivalent to <code>() =&gt; expr</code> in TypeScript). The <code>move</code> keyword makes a closure capture variables by ownership rather than by reference.</p>
+</section>
+
+<!-- CH 10 -->
+<section class="chapter" id="ch10">
+<h2><span class="ch-num">10</span> Lifetimes</h2>
+
+<p>Most of the time, Rust infers lifetimes automatically through a set of rules called <em>lifetime elision</em>. You rarely write them. But one lifetime annotation appears in this codebase and is worth understanding:</p>
+
+<pre><span class="lang-tag">rust · discord.rs</span><code><span class="kw">async fn</span> <span class="fn">get</span><span class="op">&lt;</span>T: <span class="kw">for</span><span class="op">&lt;</span><span class="lf">'de</span><span class="op">&gt;</span> <span class="tr">Deserialize</span><span class="op">&lt;</span><span class="lf">'de</span><span class="op">&gt;&gt;</span>(<span class="op">&amp;</span>self, path: <span class="op">&amp;</span><span class="ty">str</span>) <span class="op">-&gt;</span> <span class="ty">Result</span><span class="op">&lt;</span>T<span class="op">&gt;</span></code></pre>
+
+<p><code>for&lt;'de&gt; Deserialize&lt;'de&gt;</code> is a <em>higher-ranked trait bound</em>. It means: "<code>T</code> must implement <code>Deserialize</code> for any possible lifetime <code>'de</code>."</p>
+
+<p>Why is this needed? Serde's <code>Deserialize</code> trait is parameterized by the lifetime of the input data — <code>Deserialize&lt;'de&gt;</code> means "deserialized from data that lives at least as long as <code>'de</code>." When you deserialize from a temporary buffer (as <code>reqwest</code>'s <code>.json().await?</code> does), you need to guarantee that <code>T</code> doesn't hold references into that buffer that outlive it.</p>
+
+<p><code>for&lt;'de&gt;</code> says "this must work for <em>any</em> lifetime, including very short ones." In practice this means <code>T</code> must be fully owned — no borrowed references to the input. Any type with <code>#[derive(Deserialize)]</code> and only owned fields (like <code>String</code>, not <code>&amp;str</code>) satisfies this automatically.</p>
+
+<div class="callout note">You'll see <code>for&lt;'de&gt; Deserialize&lt;'de&gt;</code> whenever you write a generic function that deserializes from a temporary source. It's a fixed phrase — just use it as-is, the same way you'd use <code>async fn</code>.</div>
+</section>
+
+<!-- CH 11 -->
+<section class="chapter" id="ch11">
+<h2><span class="ch-num">11</span> Modules</h2>
+
+<p>Each file in <code>src/</code> is a module. <code>mod db;</code> in <code>main.rs</code> tells the compiler to find and compile <code>src/db.rs</code>. Items inside a module are private by default; <code>pub</code> makes them visible to callers.</p>
+
+<pre><span class="lang-tag">rust · main.rs</span><code><span class="kw">mod</span> db;
+<span class="kw">mod</span> discord;
+<span class="kw">mod</span> processor;
+<span class="kw">mod</span> server;
+<span class="kw">mod</span> summarizer;</code></pre>
+
+<p>Within a module, reference other modules with <code>crate::</code>:</p>
+
+<pre><span class="lang-tag">rust · processor.rs</span><code><span class="kw">use</span> crate::db::{<span class="fn">get_thread_summary</span>, <span class="fn">upsert_thread_summary</span>};
+<span class="kw">use</span> crate::discord::<span class="ty">DiscordClient</span>;
+<span class="kw">use</span> crate::summarizer::{<span class="ty">TranscriptMessage</span>, <span class="fn">summarize_thread</span>};</code></pre>
+
+<p><code>use</code> brings names into scope so you don't need the full path every time. <code>crate::</code> is an absolute path starting from the crate root.</p>
+
+<p>Test modules are conventionally inline, compiled only during <code>cargo test</code>:</p>
+
+<pre><span class="lang-tag">rust · db.rs</span><code><span class="at">#[cfg(test)]</span>
+<span class="kw">mod</span> tests {
+    <span class="kw">use super</span>::<span class="op">*</span>;  <span class="cm">// imports everything from the parent module</span>
+
+    <span class="at">#[tokio::test]</span>
+    <span class="kw">async fn</span> <span class="fn">upsert_and_get_roundtrip</span>() {
+        <span class="op">..</span>.
+    }
+}</code></pre>
+
+<p><code>use super::*</code> gives tests access to private internals of the module they're testing. <code>#[cfg(test)]</code> gates the module — it doesn't exist in the production binary.</p>
+</section>
+
+<!-- CH 12 -->
+<section class="chapter" id="ch12">
+<h2><span class="ch-num">12</span> A request end-to-end</h2>
+
+<p>To see how all these pieces connect, trace a single MCP <code>read_thread_summary</code> call through the stack:</p>
+
+<h3>1. axum receives the request</h3>
+<p><code>handle_mcp</code> is called with <code>State(state)</code> — axum extracts the <code>AppState</code> from the router using the <code>Clone</code> derive on <code>AppState</code> (which clone-bumps the <code>Arc</code> counts, not the underlying data).</p>
+
+<h3>2. Body is deserialized</h3>
+<p><code>serde_json::from_value::&lt;JsonRpcRequest&gt;(req_val)</code> — the <code>#[derive(Deserialize)]</code> on <code>JsonRpcRequest</code> made this zero-boilerplate. Field names match the JSON keys.</p>
+
+<h3>3. match routes to the right tool</h3>
+<pre><span class="lang-tag">rust · server.rs</span><code><span class="kw">match</span> req.method.<span class="fn">as_deref</span>() {
+    <span class="ty">Some</span>(<span class="st">"tools/call"</span>) <span class="op">=&gt;</span> {
+        <span class="kw">match</span> name {
+            <span class="ty">Some</span>(<span class="st">"read_thread_summary"</span>) <span class="op">=&gt;</span> { <span class="op">..</span>. }
+        }
+    }
+}</code></pre>
+
+<h3>4. thread_id extracted as Option</h3>
+<pre><span class="lang-tag">rust</span><code><span class="kw">let</span> thread_id <span class="op">=</span> <span class="kw">match</span> <span class="fn">get_str</span>(args, <span class="st">"thread_id"</span>) {
+    <span class="ty">Some</span>(t) <span class="op">=&gt;</span> t.<span class="fn">to_string</span>(),
+    <span class="ty">None</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="ty">Some</span>(<span class="fn">rpc_error</span>(id, <span class="op">-</span><span class="nm">32602</span>, <span class="st">"..."</span>)),
+};</code></pre>
+
+<h3>5. Rows searched by iterator</h3>
+<pre><span class="lang-tag">rust</span><code><span class="kw">let</span> row <span class="op">=</span> rows.<span class="fn">iter</span>().<span class="fn">find</span>(<span class="op">|</span>r<span class="op">|</span> r.snowflake <span class="op">==</span> lookup)
+    .<span class="fn">or_else</span>(<span class="op">||</span> rows.<span class="fn">iter</span>().<span class="fn">find</span>(<span class="op">|</span>r<span class="op">|</span> r.name <span class="op">==</span> thread_id));</code></pre>
+<p>Borrows each row with <code>&amp;</code>, no copying. Returns <code>Option&lt;&amp;ThreadSummaryRow&gt;</code>.</p>
+
+<h3>6. Response built from owned String</h3>
+<pre><span class="lang-tag">rust</span><code><span class="ty">Some</span>(<span class="fn">rpc_result</span>(id, <span class="fn">mcp_text</span>(<span class="fn">render_thread_summary_markdown</span>(r))))</code></pre>
+<p><code>render_thread_summary_markdown</code> borrows all the row's fields (<code>&amp;row.name</code>, etc.) and builds a new <code>String</code>. <code>mcp_text</code> wraps it in a <code>serde_json::Value</code> using the <code>json!</code> macro.</p>
+
+<h3>7. Response serialized and sent</h3>
+<p><code>serde_json::to_string(&amp;responses[0])</code> — <code>Value</code> implements <code>Serialize</code>, so this is a single function call. Wrapped in an axum <code>Response</code> with the appropriate content-type header.</p>
+
+<p>The entire path is synchronous-looking but fully async. Every <code>.await</code> is a point where the tokio executor can run other tasks — other HTTP requests, the background processor timer — while waiting on I/O.</p>
+</section>
+
+<hr>
+
+<!-- FURTHER -->
+<section class="chapter" id="further">
+<h2><span class="ch-num">→</span> Where to go next</h2>
+
+<div class="further">
+  <ul>
+    <li><a href="https://doc.rust-lang.org/book/" target="_blank">The Rust Book</a> — free, comprehensive, the definitive reference</li>
+    <li><a href="https://github.com/rust-lang/rustlings" target="_blank">Rustlings</a> — small exercises that build muscle memory for ownership and pattern matching</li>
+    <li><a href="https://tokio.rs/tokio/tutorial" target="_blank">Tokio tutorial</a> — the async runtime used here; the tutorial is excellent</li>
+    <li><a href="https://serde.rs/" target="_blank">serde.rs</a> — for when you need custom serialization beyond <code>#[derive]</code></li>
+    <li><code>cargo doc --open</code> — generates and opens local documentation for every dependency in this project, at the exact versions you're using</li>
+    <li><code>cargo clippy</code> — the Rust linter; treats you like an expert and explains why each suggestion matters</li>
+  </ul>
+</div>
+</section>
+
+</main>
+</div>
+
+<script>
+// Highlight active nav item on scroll
+const chapters = document.querySelectorAll('.chapter');
+const navLinks = document.querySelectorAll('nav a');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+chapters.forEach(ch => observer.observe(ch));
+</script>
+</body>
+</html>
