@@ -20,6 +20,13 @@ type McpContent = {
   text: string;
 };
 
+type McpResource = {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+};
+
 type SearchResult = {
   type: "channel" | "thread" | "message";
   id: string;
@@ -298,6 +305,32 @@ function buildSearchResults(
   return results.slice(0, limit);
 }
 
+function buildThreadSummaryResources(rows: ThreadSummaryRow[]): McpResource[] {
+  return rows.map((row) => ({
+    uri: threadUri(row.snowflake),
+    name: row.name,
+    description: `Stored Discord thread summary, updated ${new Date(
+      row.updatedAt,
+    ).toISOString()}`,
+    mimeType: "text/markdown",
+  }));
+}
+
+function renderThreadSummaryList(rows: ThreadSummaryRow[]) {
+  return JSON.stringify(
+    rows.map((row) => ({
+      id: row.snowflake,
+      uri: threadUri(row.snowflake),
+      name: row.name,
+      summary: stripHtml(row.aiSummary) || undefined,
+      lastMessageTimestamp: new Date(row.lastMessageTimestamp).toISOString(),
+      updatedAt: new Date(row.updatedAt).toISOString(),
+    })),
+    null,
+    2,
+  );
+}
+
 function renderStoredThreadSummaryMarkdown(row: ThreadSummaryRow) {
   const transcript = parseTranscript(row.transcriptJson);
   const messages = transcript
@@ -438,6 +471,7 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
       return jsonRpcResult(id, {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {
+          resources: {},
           tools: {},
         },
         serverInfo: {
@@ -445,6 +479,33 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
           version: "0.1.0",
         },
       });
+
+    case "resources/list":
+      return jsonRpcResult(id, {
+        resources: buildThreadSummaryResources(rows),
+      });
+
+    case "resources/read": {
+      const uri = getStringParam(params, "uri");
+      if (!uri) {
+        return jsonRpcError(id, -32602, "resources/read requires a uri");
+      }
+
+      const row = findThreadByReadTarget(rows, uri);
+      if (!row) {
+        return jsonRpcError(id, -32004, `No resource found for ${uri}`);
+      }
+
+      return jsonRpcResult(id, {
+        contents: [
+          {
+            uri: threadUri(row.snowflake),
+            mimeType: "text/markdown",
+            text: renderStoredThreadSummaryMarkdown(row),
+          },
+        ],
+      });
+    }
 
     case "tools/list":
       return jsonRpcResult(id, {
@@ -517,6 +578,25 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
                 },
               },
               required: ["thread_id"],
+            },
+          },
+          {
+            name: "list_thread_summaries",
+            description:
+              "List locally stored thread summaries with resource URIs for discovery.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description:
+                    "Optional text to filter stored thread names, summaries, and transcripts.",
+                },
+                limit: {
+                  type: "number",
+                  description: "Maximum number of summaries to return.",
+                },
+              },
             },
           },
         ],
@@ -629,6 +709,20 @@ async function handleMcp(request: JsonRpcRequest, rows: ThreadSummaryRow[]) {
 
         return jsonRpcResult(id, {
           content: mcpText(renderStoredThreadSummaryMarkdown(row)),
+        });
+      }
+
+      if (name === "list_thread_summaries") {
+        const query = getStringParam(args, "query") ?? "";
+        const limit = Math.max(
+          1,
+          Math.min(getNumberParam(args, "limit") ?? 50, 200),
+        );
+        const matches = rows
+          .filter((row) => rowMatches(row, query))
+          .slice(0, limit);
+        return jsonRpcResult(id, {
+          content: mcpText(renderThreadSummaryList(matches)),
         });
       }
 
