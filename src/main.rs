@@ -19,8 +19,10 @@ fn env_opt(key: &str) -> Option<String> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load .env if present (e.g. /config/.env in production); ignore if missing
-    let _ = dotenvy::dotenv();
+    // Load .env — try cwd first, then /config/.env (production mount path)
+    if dotenvy::dotenv().is_err() {
+        let _ = dotenvy::from_path("/config/.env");
+    }
     tracing_subscriber::fmt::init();
 
     let bot_token = env("DISCORD_BOT_TOKEN")?;
