@@ -19,10 +19,9 @@ fn env_opt(key: &str) -> Option<String> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load .env — try cwd first, then /config/.env (production mount path)
-    if dotenvy::dotenv().is_err() {
-        let _ = dotenvy::from_path("/config/.env");
-    }
+    // Load .env — try /config/.env (production mount path) first, then cwd for local dev
+    let _ = dotenvy::from_path("/config/.env");
+    let _ = dotenvy::dotenv();
     tracing_subscriber::fmt::init();
 
     let bot_token = env("DISCORD_BOT_TOKEN")?;
