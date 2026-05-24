@@ -1,0 +1,43 @@
+[package]
+name = "disco-snails"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "disco-snails"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP server
+axum = { version = "0.8", features = ["json"] }
+
+# HTTP client (Discord REST + anything else)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# OpenAI
+async-openai = "0.28"
+
+# SQLite
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Misc
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1"
+chrono = { version = "0.4.44", features = ["serde"] }
+
+[dev-dependencies]
+axum-test = "20"
+tempfile = "3"
+
