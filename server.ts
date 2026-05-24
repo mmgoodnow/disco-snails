@@ -56,6 +56,7 @@ type DiscordChannel = {
   id: string;
   name?: string;
   type: number;
+  guild_id?: string;
   parent_id?: string | null;
   topic?: string | null;
 };
@@ -209,9 +210,11 @@ async function readDiscordMessage(channelId: string, messageId: string) {
 }
 
 async function readDiscordForumThreads(channelId: string) {
-  const activePromise = DISCORD_GUILD_ID
+  const guildId =
+    DISCORD_GUILD_ID ?? (await getDiscordChannel(channelId)).guild_id;
+  const activePromise = guildId
     ? discordApi<{ threads: DiscordThread[] }>(
-        `/guilds/${DISCORD_GUILD_ID}/threads/active`,
+        `/guilds/${guildId}/threads/active`,
       )
     : Promise.resolve({ threads: [] });
   const archivedPromise = discordApi<{ threads: DiscordThread[] }>(
@@ -230,15 +233,30 @@ async function readDiscordForumThreads(channelId: string) {
 }
 
 async function listDiscordChannels() {
-  if (!DISCORD_GUILD_ID) {
-    throw new Error("DISCORD_GUILD_ID is not set");
+  if (DISCORD_GUILD_ID) {
+    return discordApi<DiscordChannel[]>(`/guilds/${DISCORD_GUILD_ID}/channels`);
   }
 
-  return discordApi<DiscordChannel[]>(`/guilds/${DISCORD_GUILD_ID}/channels`);
+  if (FORUM_CHANNEL_ID) {
+    return [await getDiscordChannel(FORUM_CHANNEL_ID)];
+  }
+
+  throw new Error(
+    "DISCORD_GUILD_ID or DISCORD_FORUM_CHANNEL_ID must be set to list channels",
+  );
+}
+
+async function getDiscordChannel(channelId: string) {
+  return discordApi<DiscordChannel>(`/channels/${channelId}`);
 }
 
 async function searchDiscordMessages(query: string, channelIds?: string[]) {
-  if (!DISCORD_GUILD_ID) return [];
+  const guildId =
+    DISCORD_GUILD_ID ??
+    (FORUM_CHANNEL_ID
+      ? (await getDiscordChannel(FORUM_CHANNEL_ID)).guild_id
+      : undefined);
+  if (!guildId) return [];
 
   const params = new URLSearchParams({ content: query });
   for (const channelId of channelIds ?? []) {
@@ -246,7 +264,7 @@ async function searchDiscordMessages(query: string, channelIds?: string[]) {
   }
 
   const result = await discordApi<{ messages?: DiscordMessage[][] }>(
-    `/guilds/${DISCORD_GUILD_ID}/messages/search?${params.toString()}`,
+    `/guilds/${guildId}/messages/search?${params.toString()}`,
   );
 
   return (result.messages ?? []).flat();
