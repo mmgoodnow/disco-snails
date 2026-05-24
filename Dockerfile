@@ -1,8 +1,8 @@
-FROM rust:1-slim AS builder
+FROM rust:1-alpine AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache musl-dev
 
 COPY Cargo.toml Cargo.lock ./
 # Cache deps by building a dummy main first
@@ -11,9 +11,9 @@ RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo build --release && rm
 COPY src ./src
 RUN touch src/main.rs && cargo build --release
 
-FROM debian:bookworm-slim AS runner
+FROM alpine:3 AS runner
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /config
 
