@@ -10,6 +10,7 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::{
+    credentials,
     discord::{DiscordChannel, DiscordClient, DiscordMessage},
     service::{self, ServiceConfig},
     summarizer::{self, SummaryFormat, TranscriptMessage},
@@ -33,7 +34,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Inspect the configured Discord bot identity.
+    /// Manage the Discord bot token and inspect its identity.
     Auth(AuthArgs),
     /// Work with Discord guilds (servers).
     Guild(GuildArgs),
@@ -57,6 +58,17 @@ struct AuthArgs {
 
 #[derive(Debug, Subcommand)]
 enum AuthCommand {
+    /// Save a bot token in macOS Keychain (hidden prompt by default).
+    Login {
+        /// Read the token from stdin instead of prompting.
+        #[arg(long, conflicts_with = "from_env")]
+        stdin: bool,
+        /// Save DISCORD_BOT_TOKEN from the environment or .env.
+        #[arg(long)]
+        from_env: bool,
+    },
+    /// Remove the saved macOS Keychain token; leaves .env unchanged.
+    Logout,
     /// Validate the bot token and print its identity.
     Status,
 }
@@ -308,16 +320,42 @@ fn env_value(key: &str) -> Option<String> {
     env::var(key).ok().filter(|value| !value.trim().is_empty())
 }
 
-fn required_env(key: &str) -> Result<String> {
-    env_value(key).with_context(|| format!("{key} is not set"))
+fn bot_token() -> Result<String> {
+    credentials::resolve_token(env_value("DISCORD_BOT_TOKEN"), credentials::read_token)
 }
 
 fn discord_client() -> Result<DiscordClient> {
-    Ok(DiscordClient::new(required_env("DISCORD_BOT_TOKEN")?))
+    Ok(DiscordClient::new(bot_token()?))
 }
 
 async fn run_auth(args: AuthArgs, json_output: bool) -> Result<()> {
     match args.command {
+        AuthCommand::Login { stdin, from_env } => {
+            credentials::ensure_supported()?;
+            let token = if from_env {
+                env_value("DISCORD_BOT_TOKEN").context("DISCORD_BOT_TOKEN is not set")?
+            } else if stdin {
+                let mut token = String::new();
+                io::stdin().read_to_string(&mut token)?;
+                token
+            } else {
+                credentials::prompt_token()?
+            };
+            credentials::save_token(&token)?;
+            if json_output {
+                print_json(&json!({"stored": true, "storage": "keychain"}))?;
+            } else {
+                println!("Bot token saved in macOS Keychain.");
+            }
+        }
+        AuthCommand::Logout => {
+            credentials::delete_token()?;
+            if json_output {
+                print_json(&json!({"stored": false, "storage": "keychain"}))?;
+            } else {
+                println!("Keychain token removed. DISCORD_BOT_TOKEN and .env still apply if set.");
+            }
+        }
         AuthCommand::Status => {
             let user = discord_client()?.get_current_user().await?;
             if json_output {
@@ -555,7 +593,7 @@ async fn run_api(args: ApiArgs) -> Result<()> {
 
 async fn run_service(args: ServeArgs) -> Result<()> {
     let config = ServiceConfig {
-        bot_token: required_env("DISCORD_BOT_TOKEN")?,
+        bot_token: bot_token()?,
         forum_channel_id: args
             .forum
             .or_else(|| env_value("DISCORD_FORUM_CHANNEL_ID"))

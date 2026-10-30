@@ -1,4 +1,5 @@
 pub mod cli;
+mod credentials;
 pub mod db;
 pub mod discord;
 pub mod processor;

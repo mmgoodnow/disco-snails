@@ -27,7 +27,20 @@ OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-5-mini
 ```
 
-Keep the configuration file private (`chmod 600 .env`). The CLI never prints the bot token.
+On macOS, store the bot token in Keychain instead of a file:
+
+```bash
+disco auth login              # hidden token prompt
+disco auth login --from-env   # copy the existing environment/.env token into Keychain
+disco auth status
+disco auth logout             # remove the Keychain entry
+```
+
+`disco auth login --stdin` also accepts a token piped from a secret manager. Tokens are never accepted as command-line arguments or printed.
+
+`DISCORD_BOT_TOKEN` in the environment or `.env` takes precedence over Keychain. When it is unset or empty, all Discord commands and service mode use the saved Keychain token on macOS. The Keychain item uses service `disco` and account `discord-bot-token`. Linux and Docker continue to use the environment or `.env`.
+
+Saving a token does not remove it from `.env`; remove that entry yourself if you want Keychain to be the only source. Keep any remaining configuration file private (`chmod 600 .env`).
 
 ## Commands
 
