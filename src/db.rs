@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -28,7 +28,9 @@ pub async fn open_db(path: &str) -> Result<SqlitePool> {
     .execute(&pool)
     .await?;
     // Clean up orphaned table left by a previous one-time migration.
-    let _ = sqlx::query("DROP TABLE IF EXISTS thread_summaries_new").execute(&pool).await;
+    let _ = sqlx::query("DROP TABLE IF EXISTS thread_summaries_new")
+        .execute(&pool)
+        .await;
     Ok(pool)
 }
 
@@ -63,7 +65,10 @@ pub async fn upsert_thread_summary(
     Ok(())
 }
 
-pub async fn get_thread_summary(pool: &SqlitePool, snowflake: &str) -> Result<Option<ThreadSummaryRow>> {
+pub async fn get_thread_summary(
+    pool: &SqlitePool,
+    snowflake: &str,
+) -> Result<Option<ThreadSummaryRow>> {
     Ok(sqlx::query_as::<_, ThreadSummaryRow>(
         "SELECT snowflake, name, ai_summary, last_message_timestamp, updated_at, transcript_json
          FROM thread_summaries WHERE snowflake = ?1 LIMIT 1",
@@ -96,7 +101,10 @@ mod tests {
     #[tokio::test]
     async fn list_empty() {
         let (pool, _f) = make_pool().await;
-        assert!(super::list_thread_summaries(&pool).await.unwrap().is_empty());
+        assert!(super::list_thread_summaries(&pool)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]
@@ -105,7 +113,10 @@ mod tests {
         super::upsert_thread_summary(&pool, "123", "my thread", "[]", "<p>hi</p>", 1000, 2000)
             .await
             .unwrap();
-        let row = super::get_thread_summary(&pool, "123").await.unwrap().unwrap();
+        let row = super::get_thread_summary(&pool, "123")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.snowflake, "123");
         assert_eq!(row.name, "my thread");
         assert_eq!(row.transcript_json, "[]");
@@ -123,7 +134,10 @@ mod tests {
         super::upsert_thread_summary(&pool, "123", "new", "[{}]", "new", 1500, 3000)
             .await
             .unwrap();
-        let row = super::get_thread_summary(&pool, "123").await.unwrap().unwrap();
+        let row = super::get_thread_summary(&pool, "123")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.name, "new");
         assert_eq!(row.last_message_timestamp, 1500);
     }
@@ -131,8 +145,12 @@ mod tests {
     #[tokio::test]
     async fn list_ordered_newest_first() {
         let (pool, _f) = make_pool().await;
-        super::upsert_thread_summary(&pool, "1", "older", "[]", "", 1000, 0).await.unwrap();
-        super::upsert_thread_summary(&pool, "2", "newer", "[]", "", 2000, 0).await.unwrap();
+        super::upsert_thread_summary(&pool, "1", "older", "[]", "", 1000, 0)
+            .await
+            .unwrap();
+        super::upsert_thread_summary(&pool, "2", "newer", "[]", "", 2000, 0)
+            .await
+            .unwrap();
         let rows = super::list_thread_summaries(&pool).await.unwrap();
         assert_eq!(rows[0].snowflake, "2");
         assert_eq!(rows[1].snowflake, "1");
@@ -141,6 +159,9 @@ mod tests {
     #[tokio::test]
     async fn get_missing_is_none() {
         let (pool, _f) = make_pool().await;
-        assert!(super::get_thread_summary(&pool, "nope").await.unwrap().is_none());
+        assert!(super::get_thread_summary(&pool, "nope")
+            .await
+            .unwrap()
+            .is_none());
     }
 }
